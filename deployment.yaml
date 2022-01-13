@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: staging
+  name: staging-abdi
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: staging-abdi
+  template:
+    metadata:
+      labels:
+        app: staging-abdi
+        env: staging
+    spec:
+      volumes:
+      - name: staging-backend-gcp-key
+        secret:
+          secretName: staging-backend-gcp-key  
+      containers:
+      - name: staging-abdi
+        image: nginxdemos/nginx-hello:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: staging-abdi
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/key.json
+        volumeMounts:
+        - name: staging-backend-gcp-key
+          mountPath: /var/secrets/google
+        resources:
+            requests:
+               cpu: "30m"
+               memory: "150Mi"
+            limits:
+               cpu: "300m"
+               memory: "350Mi"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 8
+        livenessProbe:
+           httpGet:
+             path: /
+             port: 8080
+           initialDelaySeconds: 15
+           periodSeconds: 8
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "sleep 8"]
